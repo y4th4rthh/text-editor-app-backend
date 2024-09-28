@@ -17,7 +17,7 @@ const mongoURI = 'mongodb+srv://yatharthpatel014:yatharth@cluster0.5uwjd.mongodb
 mongoose.connect(mongoURI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
-    dbName: 'ResumeData'
+    dbName: 'TextEditor'
 });
 
 const db = mongoose.connection;
@@ -35,7 +35,7 @@ const UserSchema = new Schema({
     password: String,
 });
 
-const User = mongoose.model('User', UserSchema);
+const User = mongoose.model('user', UserSchema);
 
 // Registration endpoint
 app.post('/api/register', async (req, res) => {
