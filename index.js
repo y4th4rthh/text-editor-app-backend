@@ -30,7 +30,7 @@ db.once('open', () => {
 
 const Schema = mongoose.Schema;
 
-const userSchema = new Schema({
+const UserSchema = new Schema({
     email: String,
     password: String,
 });
