@@ -37,42 +37,33 @@ const UserSchema = new Schema({
 
 const User = mongoose.model('user', UserSchema);
 
-// Registration endpoint
 app.post('/api/register', async (req, res) => {
-  
+  try {
     const { email, password } = req.body;
     
     // Check if user already exists
-    try {
-        const newUser = new User({ email, password });
-
-        const savedUser = await newUser.save();
-        
-        res.json(savedUser);
-    } catch (err) {
-        console.error('Error saving user:', err);
-        res.status(500).send('Error saving user');
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: 'User already exists' });
     }
 
-    // const existingUser = await User.findOne({ email });
-    // if (existingUser) {
-    //   return res.status(400).json({ error: 'User already exists' });
-    // }
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    // // Hash password
-    // const salt = await bcrypt.genSalt(10);
-    // const hashedPassword = await bcrypt.hash(password, salt);
+    // Create new user
+    const newUser = new User({
+      email,
+      password: hashedPassword,
+    });
 
-    // // Create new user
-    // const newUser = new User({
-    //   email,
-    //   password: hashedPassword,
-    // });
+    await newUser.save();
 
-    // await newUser.save();
-
-    // res.status(201).json({ message: 'User registered successfully' });
-  
+    res.status(201).json({ message: 'User registered successfully' });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Login endpoint
@@ -83,17 +74,19 @@ app.post('/api/login', async (req, res) => {
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ error: 'User not found' });
+      return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    if ( user.password !== password || user.email !== email) {
-        return res.status(400).json({ message: 'Invalid credentials' }); 
-    }
     // Check password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Invalid credentials' });
+    }
 
+    // Here you would typically create and send a JWT token
+    // For simplicity, we're just sending a success message
     res.json({ message: 'Logged in successfully' });
-  } 
-  catch (error) {
+  } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
