@@ -10,11 +10,11 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // MongoDB connection (use environment variable for the URI)
-const mongoURI = process.env.MONGODB_URI || 'your_mongodb_uri_here';
+const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://yatharthpatel014:yatharth@cluster0.5uwjd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 mongoose.connect(mongoURI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
-    dbName: 'CodeFormatter'
+    dbName: 'TextEditor'
 });
 
 const db = mongoose.connection;
