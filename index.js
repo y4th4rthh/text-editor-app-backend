@@ -27,7 +27,6 @@ db.once('open', () => {
 });
 
 // User model
-
 const Schema = mongoose.Schema;
 
 const UserSchema = new Schema({
