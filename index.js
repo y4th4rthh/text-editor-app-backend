@@ -27,7 +27,6 @@ db.once('open', () => {
 });
 
 // User model
-
 const Schema = mongoose.Schema;
 
 const UserSchema = new Schema({
@@ -109,29 +108,18 @@ app.post('/run-code', async (req, res) => {
                 await fs.writeFile(filePath, code);
                 command = `python "${filePath}"`;
                 break;
-            case 'java':
-                const classMatch = code.match(/public\s+class\s+(\w+)/);
-                if (classMatch) {
-                    const className = classMatch[1];
-                    filePath = path.join(tempDir, `${className}.java`);
-                    await fs.writeFile(filePath, code);
-                    command = `javac "${filePath}" && java -cp "${tempDir}" ${className}`;
-                } else {
-                    throw new Error('No public class found in Java code');
-                }
-                break;
+            case 'html':
+            case 'css':
+                // For HTML/CSS, we'll just send the code back to be rendered on the client-side
+                return res.json({ output: code });
             default:
-                return res.json({ error: 'Unsupported language. Please use Java or Python.' });
+                return res.json({ error: 'Unsupported language. Please use Python, HTML, or CSS.' });
         }
-        // Execute the code
+        // Execute the code (only for Python in this case)
         exec(command, { cwd: tempDir }, async (error, stdout, stderr) => {
             try {
                 // Cleanup temp files
                 await fs.unlink(filePath);
-                if (language === 'java') {
-                    const className = path.parse(filePath).name;
-                    await fs.unlink(path.join(tempDir, `${className}.class`)).catch(() => {});
-                }
                 if (error) {
                     return res.json({ error: stderr });
                 }
