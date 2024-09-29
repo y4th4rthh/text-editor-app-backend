@@ -1,10 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { exec } = require('child_process');
-const fs = require('fs').promises;
-const path = require('path');
-const os = require('os');
+const prettier = require('prettier');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
@@ -12,8 +9,8 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// MongoDB connection
-const mongoURI = 'mongodb+srv://yatharthpatel014:yatharth@cluster0.5uwjd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+// MongoDB connection (use environment variable for the URI)
+const mongoURI = process.env.MONGODB_URI || 'mongodb+srv://yatharthpatel014:yatharth@cluster0.5uwjd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 mongoose.connect(mongoURI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
@@ -27,31 +24,26 @@ db.once('open', () => {
 });
 
 // User model
-
 const Schema = mongoose.Schema;
-
 const UserSchema = new Schema({
     email: String,
     password: String,
 });
-
 const User = mongoose.model('user', UserSchema);
 
+// Registration endpoint
 app.post('/api/register', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create new user
     const newUser = new User({
       email,
       password: hashedPassword,
@@ -71,20 +63,17 @@ app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Here you would typically create and send a JWT token
-    // For simplicity, we're just sending a success message
+    // TODO: Implement JWT token generation here
     res.json({ message: 'Logged in successfully' });
   } catch (error) {
     console.error('Login error:', error);
@@ -92,60 +81,73 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-const getTempDirectory = () => {
-    return os.tmpdir();
-};
-
-app.post('/run-code', async (req, res) => {
+// Code formatting endpoint
+app.post('/format-code', async (req, res) => {
     const { code, language } = req.body;
-    let command = '';
-    const tempDir = getTempDirectory();
-    let tempFileName = `tempCode_${Date.now()}`;
-    let filePath = '';
+
     try {
-        switch (language) {
+        let formattedCode;
+        let parser;
+
+        switch (language.toLowerCase()) {
+            case 'javascript':
+            case 'js':
+                parser = 'babel';
+                break;
+            case 'typescript':
+            case 'ts':
+                parser = 'typescript';
+                break;
+            case 'css':
+                parser = 'css';
+                break;
+            case 'html':
+                parser = 'html';
+                break;
+            case 'json':
+                parser = 'json';
+                break;
+            case 'markdown':
+            case 'md':
+                parser = 'markdown';
+                break;
+            case 'yaml':
+                parser = 'yaml';
+                break;
             case 'python':
-                filePath = path.join(tempDir, `${tempFileName}.py`);
-                await fs.writeFile(filePath, code);
-                command = `python "${filePath}"`;
-                break;
+            case 'py':
+                // For Python, we'll use a different approach
+                formattedCode = await formatPython(code);
+                return res.json({ formattedCode });
             case 'java':
-                const classMatch = code.match(/public\s+class\s+(\w+)/);
-                if (classMatch) {
-                    const className = classMatch[1];
-                    filePath = path.join(tempDir, `${className}.java`);
-                    await fs.writeFile(filePath, code);
-                    command = `javac "${filePath}" && java -cp "${tempDir}" ${className}`;
-                } else {
-                    throw new Error('No public class found in Java code');
-                }
-                break;
+            case 'c':
+            case 'cpp':
+                // For Java, C, and C++, we'll use a different approach
+                formattedCode = await formatCFamily(code, language);
+                return res.json({ formattedCode });
             default:
-                return res.json({ error: 'Unsupported language. Please use Java or Python.' });
+                return res.status(400).json({ error: 'Unsupported language' });
         }
-        // Execute the code
-        exec(command, { cwd: tempDir }, async (error, stdout, stderr) => {
-            try {
-                // Cleanup temp files
-                await fs.unlink(filePath);
-                if (language === 'java') {
-                    const className = path.parse(filePath).name;
-                    await fs.unlink(path.join(tempDir, `${className}.class`)).catch(() => {});
-                }
-                if (error) {
-                    return res.json({ error: stderr });
-                }
-                res.json({ output: stdout });
-            } catch (cleanupError) {
-                console.error('Error during cleanup:', cleanupError);
-                res.json({ error: 'An error occurred during cleanup' });
-            }
-        });
-    } catch (err) {
-        console.error('Error:', err);
-        res.json({ error: err.message });
+
+        formattedCode = await prettier.format(code, { parser: parser });
+        res.json({ formattedCode });
+    } catch (error) {
+        console.error('Formatting error:', error);
+        res.status(500).json({ error: 'An error occurred during formatting' });
     }
 });
+
+async function formatPython(code) {
+    // Here you would integrate with a Python formatter like Black
+    // For now, we'll just return the original code
+    return code;
+}
+
+async function formatCFamily(code, language) {
+    // Here you would integrate with a formatter for C-family languages
+    // For now, we'll just return the original code
+    return code;
+}
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
