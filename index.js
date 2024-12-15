@@ -91,49 +91,44 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-const getTempDirectory = () => {
-    return os.tmpdir();
-};
-
 app.post('/run-code', async (req, res) => {
     const { code, language } = req.body;
-    let command = '';
-    const tempDir = getTempDirectory();
-    let tempFileName = `tempCode_${Date.now()}`;
-    let filePath = '';
+    
     try {
         switch (language) {
             case 'python':
-                filePath = path.join(tempDir, `${tempFileName}.py`);
-                await fs.writeFile(filePath, code);
-                command = `python "${filePath}"`;
+                try {
+                    const tempFilePath = path.join(os.tmpdir(), `tempCode_${Date.now()}.py`);
+                    
+                    await fs.writeFile(tempFilePath, code);
+                    
+                    exec(`python "${tempFilePath}"`, (error, stdout, stderr) => {
+                        fs.unlink(tempFilePath).catch(console.error);
+                        
+                        if (error) {
+                            return res.json({ error: stderr });
+                        }
+                        
+                        res.json({ output: stdout });
+                    });
+                } catch (err) {
+                    res.json({ error: err.message });
+                }
                 break;
+            
             case 'html':
             case 'css':
                 // For HTML/CSS, we'll just send the code back to be rendered on the client-side
                 return res.json({ output: code });
+            
             default:
                 return res.json({ error: 'Unsupported language. Please use Python, HTML, or CSS.' });
         }
-        // Execute the code (only for Python in this case)
-        exec(command, { cwd: tempDir }, async (error, stdout, stderr) => {
-            try {
-                // Cleanup temp files
-                await fs.unlink(filePath);
-                if (error) {
-                    return res.json({ error: stderr });
-                }
-                res.json({ output: stdout });
-            } catch (cleanupError) {
-                console.error('Error during cleanup:', cleanupError);
-                res.json({ error: 'An error occurred during cleanup' });
-            }
-        });
-    } catch (err) {
-        console.error('Error:', err);
-        res.json({ error: err.message });
+    } catch (error) {
+        res.json({ error: 'An unexpected error occurred' });
     }
 });
+     
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
