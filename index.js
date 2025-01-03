@@ -12,7 +12,6 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// MongoDB connection
 const mongoURI = 'mongodb+srv://yatharthpatel014:yatharth@cluster0.5uwjd.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
 mongoose.connect(mongoURI, {
     useNewUrlParser: true,
@@ -26,7 +25,6 @@ db.once('open', () => {
     console.log('Connected to MongoDB');
 });
 
-// User model
 const Schema = mongoose.Schema;
 
 const UserSchema = new Schema({
@@ -40,17 +38,14 @@ app.post('/api/register', async (req, res) => {
   try {
     const { email, password } = req.body;
     
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create new user
     const newUser = new User({
       email,
       password: hashedPassword,
@@ -65,25 +60,20 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Login endpoint
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ error: 'Invalid credentials' });
     }
 
-    // Here you would typically create and send a JWT token
-    // For simplicity, we're just sending a success message
     res.json({ message: 'Logged in successfully' });
   } catch (error) {
     console.error('Login error:', error);
@@ -118,7 +108,6 @@ app.post('/run-code', async (req, res) => {
             
             case 'html':
             case 'css':
-                // For HTML/CSS, we'll just send the code back to be rendered on the client-side
                 return res.json({ output: code });
             
             default:
